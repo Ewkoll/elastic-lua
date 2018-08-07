@@ -15,19 +15,19 @@ end
 
 function search_request:__tostring()
     return string.format(
-        "indices = %s, types = %s, routing = %s, preference = %s, indices_options = %s, \
-        search_type = %s, source = %s, scroll = %s, request_cache = %s, batched_reduce_size = %d, \
-        max_concurrent_shard_requests = %d, prefilter_shard_size = %d",
+        "indices = %s, types = %s, routing = %s, preference = %s, search_type = %s, \
+        source = %s, scroll = %s, request_cache = %s, batched_reduce_size = %d, \
+        allow_partial_search_results = %s max_concurrent_shard_requests = %d, prefilter_shard_size = %d",
         (search_request._indices or ""),
         (search_request._types or ""),
         (search_request._routing or ""),
         (search_request._preference or ""),
-        (search_request._indices_options or ""),
         (search_request._search_type or ""),
         (search_request._source or ""),
         (search_request._scroll or ""),
         (search_request._cache or "false"),
         (search_request._batched_reduce_size or 512),
+        (search_request._allow_partial_search_results or "false"),
         (search_request._max_concurrent_shard_requests or -1),
         (search_request._prefilter_shard_size or 128)
     )
@@ -80,20 +80,6 @@ function search_request:preference(preference)
 end
 
 --[[
-    Controls how to deal with unavailable concrete indices (closed or missing), how wildcard expressions are expanded
-    to actual indices (all, closed or open indices) and how to deal with wildcard expressions that resolve to no indices
-    defaults to ignore_unavailable = true
---]]
-function search_request:indices_options(indices_options)
-    if nil ~= indices_options and nil ~= indices_options.istypeof then
-        if indices_options:istypeof("indices_options") then
-            search_request._indices_options = indices_options
-        end
-    end
-    return self
-end
-
---[[
     The search type to execute, defaults to QUERY_THEN_FETCH.
 --]]
 function search_request:search_type(search_type)
@@ -108,30 +94,6 @@ function search_request:search_type(search_type)
 end
 
 --[[
-    The search type to source builder object.
---]]
-function search_request:source(source)
-    if nil ~= source and nil ~= source.istypeof then
-        if source:istypeof("search_source_builder") then
-            search_request._source = source
-        end
-    end
-    return self
-end
-
---[[
-    If set, will enable scrolling of the search request.
---]]
-function search_request:scroll(scroll)
-    if nil ~= scroll and nil ~= scroll.istypeof then
-        if scroll:istypeof("scroll") then
-            search_request._scroll = scroll
-        end
-    end
-    return self
-end
-
---[[
     Sets if this request should use the request cache or not, assuming that it can (for
     example, if "now" is used, it will never be cached). By default (not set, or null,
     will default to the index level setting if request cache is enabled or not).
@@ -139,6 +101,17 @@ end
 function search_request:request_cache(cache)
     if self:is_boolean(cache) then
         search_request._cache = cache
+    end
+    return self
+end
+
+--[[
+    Set to false to return an overall failure if the request would produce partial results.
+    Defaults to true, which will allow partial results in the case of timeouts or partial failures.
+--]]
+function search_request:allow_partial_search_results(allow_partial_search_results)
+    if self:is_boolean(allow_partial_search_results) then
+        search_request._allow_partial_search_results = allow_partial_search_results
     end
     return self
 end
@@ -184,6 +157,44 @@ function search_request:set_prefilter_shard_size(prefilter_shard_size)
         if prefilter_shard_size >= 1 then
             search_request._prefilter_shard_size = prefilter_shard_size
         end
+    end
+    return self
+end
+
+--[[
+    The maximum number of documents to collect for each shard, upon reaching which the query execution will
+    terminate early. If set, the response will have a boolean field terminated_early to indicate whether
+    the query execution has actually terminated_early. Defaults to no terminate_after.
+
+    In case we only want to know if there are any documents matching a specific query, we can set the size
+    to 0 to indicate that we are not interested in the search results. Also we can set terminate_after to
+    1 to indicate that the query execution can be terminated whenever the first matching document was found (per shard).
+
+    size=0&terminate_after=1
+--]]
+function search_request:terminate_after(terminate_after)
+    if self:is_number(terminate_after) then
+        search_request._terminate_after = terminate_after
+    end
+    return self
+end
+
+--[[
+    The search type to source builder object.
+--]]
+function search_request:source(source)
+    if nil ~= source and nil ~= source.is and source:is(search_source_builder) then
+        search_request._source = source
+    end
+    return self
+end
+
+--[[
+    If set, will enable scrolling of the search request.
+--]]
+function search_request:scroll(scroll)
+    if nil ~= scroll and nil ~= scroll.is and scroll:is(scroll) then
+        search_request._scroll = scroll
     end
     return self
 end

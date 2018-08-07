@@ -18,25 +18,8 @@ end
     Sets the search query for this request.
 --]]
 function search_source_builder:query(query_builder)
-    if nil ~= query_builder then
-        --if query_builder:is(abstract_query_builder) then
-            ngx.log(ngx.DEBUG, "3233")
-            self._query_builder = query_builder
-        --end
-    end
-    return self
-end
-
---[[
-    Sets a filter that will be executed after the query has been executed and
-    only has affect on the search hits (not aggregations). This filter is
-    always executed as last filtering mechanism.
---]]
-function search_source_builder:post_filter(query_builder)
-    if nil ~= query_builder and nil ~= query_builder.istypeof then
-        if query_builder:istypeof("query_builder") then
-            self._post_filter = query_builder
-        end
+    if nil ~= query_builder and nil ~= query_builder.is and query_builder:is(abstract_query_builder) then
+        self._query_builder = query_builder
     end
     return self
 end
@@ -55,12 +38,131 @@ end
 
 --[[
     The number of search hits to return. Defaults to <tt>10</tt>.
+    index.max_result_window default to 10000
 --]]
 function search_source_builder:size(size)
     if self:is_number(size) then
         if size >= 0 then
             self._size = size
         end
+    end
+    return self
+end
+
+--[[
+    An optional timeout to control how long search is allowed to take. defalt 60s
+--]]
+function search_source_builder:timeout(timeout)
+    if self:is_string(from) then
+        self._timeout = timeout
+    end
+    return self
+end
+
+--[[
+    Adds a sort against the given field name and the sort ordering.
+--]]
+function search_source_builder:sort(sort_data)
+    if nil ~= sort_data and nil ~= sort_data.is and sort_data:is(sort) then
+        self._sort_data = sort_data
+    end
+    return self
+end
+
+--[[
+    Indicates whether the response should contain the stored _source for every hit
+    "_source": false
+--]]
+function search_source_builder:fetch_source(fetch_source)
+    if self:is_boolean(fetch_source) then
+        self._fetch_source = fetch_source
+    end
+    return self
+end
+
+--[[
+    Indicates whether the response should contain the stored _source for every hit
+    "_source": {
+        "includes": [ "obj1.*", "obj2.*" ],
+        "excludes": [ "*.description" ]
+    }
+--]]
+function search_source_builder:fetch_source(includes, excludes)
+    if self:is_table(includes) then
+        self._fetch_source_includes = includes
+    end
+
+    if self:is_table(excludes) then
+        self._fetch_source_excludes = excludes
+    end
+    return self
+end
+
+--[[
+    Sets the stored fields to load and return as part of the search request. If none
+    are specified, the source of the document will be returned.
+    To disable the stored fields (and metadata fields) entirely use: _none_
+--]]
+function search_source_builder:stored_field(stored_field)
+    if self:is_table(stored_field) then
+        self._stored_field = stored_field
+    end
+    return self
+end
+
+--[[
+    Adds a script field under the given name with the provided script.
+--]]
+function search_source_builder:script_field(script)
+    if nil ~= script and nil ~= script.is and script:is(script) then
+        self._script = script
+    end
+    return self
+end
+
+--[[
+    Adds a field to load from the docvalue and return as part of the search request.
+     "docvalue_fields" : ["test1", "test2"]
+--]]
+function search_source_builder:doc_value_field(doc_value_fields)
+    if self:is_table(doc_value_fields) then
+        self._doc_value_fields = doc_value_fields
+    end
+    return self
+end
+
+--[[
+    Sets a filter that will be executed after the query has been executed and
+    only has affect on the search hits (not aggregations). This filter is
+    always executed as last filtering mechanism.
+--]]
+function search_source_builder:post_filter(post_filter)
+    if nil ~= post_filter and nil ~= post_filter.is and post_filter:is(post_filter) then
+        self._post_filter = post_filter
+    end
+    return self
+end
+
+--[[
+    Adds highlight to perform as part of the search.
+--]]
+function search_source_builder:highlighter(highlighter)
+    if nil ~= highlighter and nil ~= highlighter.is and highlighter:is(highlighter) then
+        self._highlighter = highlighter
+    end
+    return self
+end
+
+--[[
+    The abstract base builder for instances of {@link RescorerBuilder}.
+--]]
+function search_source_builder:rescorer(rescorer_builder)
+    if nil == self._rescorer_builders then
+        self._rescorer_builders = {}
+    end
+
+    if nil ~= rescorer_builder then
+        table.insert(self._rescorer_builders, rescorer_builder)
     end
     return self
 end
@@ -92,42 +194,6 @@ function search_source_builder:version(version)
     if self:is_boolean(from) then
         self._version = version
     end
-    return self
-end
-
---[[
-    An optional timeout to control how long search is allowed to take. defalt 60s
---]]
-function search_source_builder:timeout(timeout)
-    if self:is_string(from) then
-        self._timeout = timeout
-    end
-    return self
-end
-
---[[
-    An optional terminate_after to terminate the search after collecting <code>terminateAfter</code> documents
---]]
-function search_source_builder:terminate_after(terminate_after)
-    if self:is_number(terminate_after) then
-        if terminate_after >= 0 then
-            self._terminate_after = terminate_after
-        end
-    end
-    return self
-end
-
---[[
-    Adds a sort against the given field name and the sort ordering.
---]]
-function search_source_builder:sort(name, order)
-    if nil == self._sort then
-        self._sort = {}
-    end
-
-    local sort = {}
-    sort[name] = order
-    table.insert(self._sort, sort)
     return self
 end
 
@@ -197,16 +263,6 @@ function search_source_builder:aggregation(aggregation_builder)
 end
 
 --[[
-    Adds highlight to perform as part of the search.
---]]
-function search_source_builder:highlighter(highlighter_builder)
-    if nil ~= highlighter_builder then
-        self._highlighter_builder = highlighter_builder
-    end
-    return self
-end
-
---[[
     Defines how to perform suggesting. This builders allows a number of global options to be specified and
     an arbitrary number of {@link SuggestionBuilder} instances.
  
@@ -220,19 +276,7 @@ function search_source_builder:suggest(suggest_builder)
     return self
 end
 
---[[
-    The abstract base builder for instances of {@link RescorerBuilder}.
---]]
-function search_source_builder:add_rescorer(rescorer_builder)
-    if nil == self._rescorer_builders then
-        self._rescorer_builders = {}
-    end
 
-    if nil ~= rescorer_builder then
-        table.insert(self._rescorer_builders, rescorer_builder)
-    end
-    return self
-end
 
 --[[
     Should the query be profiled. Defaults to <tt>false</tt>
@@ -244,65 +288,6 @@ function search_source_builder:profile(profile)
     return self
 end
 
---[[
-    Indicates whether the response should contain the stored _source for every hit
---]]
-function search_source_builder:fetch_source(fetch_source)
-    if self:is_boolean(fetch_source) then
-        self._fetch_source = fetch_source
-    end
-    return self
-end
-
---[[
-    Indicates whether the response should contain the stored _source for every hit
---]]
-function search_source_builder:fetch_source(includes, excludes)
-    self._fetch_source_includes = utils.convert_source(includes)
-    self._fetch_source_excludes = utils.convert_source(excludes)
-    return self
-end
-
---[[
-    Sets the stored fields to load and return as part of the search request. If none
-    are specified, the source of the document will be returned.
---]]
-function search_source_builder:stored_field(stored_field)
-    if self:is_table(stored_field) then
-        self._stored_field = stored_field
-    end
-    return self
-end
-
---[[
-    Adds a field to load from the docvalue and return as part of the search request.
---]]
-function search_source_builder:doc_value_field(name)
-    if nil == self._doc_value_fields then
-        self._doc_value_fields = {}
-    end
-
-    if self:is_string(name) then
-        table.insert(self._doc_value_fields, name)
-    end
-    return self
-end
-
---[[
-    Adds a script field under the given name with the provided script.
---]]
-function search_source_builder:script_field(name, script, ignore_failure)
-    if nil == self._script_fields then
-        self._script_fields = {}
-    end
-
-    local script_data = {}
-    script_data["name"] = name
-    script_data["script"] = script
-    script_data["ignore_failure"] = ignore_failure
-    table.insert(self._script_fields, script_data)
-    return self
-end
 
 --[[
     Sets the boost a specific index or alias will receive when the query is executed against it.
@@ -346,12 +331,24 @@ function search_source_builder:ext(search_ext_builders)
     return self
 end
 
-function search_source_builder:fill_query_builder(table, key, query_builder)
-    if nil == query_builder or nil == query_builder.to_content then
+function search_source_builder:fill_source(content)
+    if nil ~= self._fetch_source then
+        self:fill_object(content, "_source", self._fetch_source)
+    else
+        self:fill_object(
+            content,
+            "_source",
+            {includes = self._fetch_source_includes, excludes = self._fetch_source_excludes}
+        )
+    end
+end
+
+function search_source_builder:fill_content(table, key, object_content)
+    if nil == object_content or nil == object_content.to_content then
         return
     end
 
-    self:fill_object(table, key, query_builder:to_content())
+    self:fill_object(table, key, object_content:to_content())
 end
 
 --[[
@@ -362,7 +359,14 @@ function search_source_builder:to_content()
     self:fill_object(content, "from", self._from)
     self:fill_object(content, "size", self._size)
     self:fill_object(content, "timeout", self._timeout)
-    self:fill_query_builder(content, "query", self._query_builder)
+    self:fill_content(content, "sort", self._sort_data)
+    self:fill_content(content, "query", self._query_builder)
+    self:fill_source(content)
+    self:fill_object(content, "stored_fields", self._stored_field)
+    self:fill_content(content, "script_fields", self._script)
+    self:fill_object(content, "docvalue_fields", self._doc_value_fields)
+    self:fill_content(content, "post_filter", self._post_filter)
+    self:fill_content(content, "highlight", self._highlighter)
     return content
 end
 
